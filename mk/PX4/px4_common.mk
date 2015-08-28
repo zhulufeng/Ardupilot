@@ -22,6 +22,7 @@ MODULES		+= drivers/px4flow
 MODULES		+= drivers/rgbled
 MODULES		+= drivers/mpu6000
 MODULES		+= drivers/hmc5883
+
 MODULES		+= drivers/ms5611
 MODULES		+= drivers/mb12xx
 MODULES		+= drivers/ll40ls
@@ -36,6 +37,11 @@ MODULES		+= drivers/meas_airspeed
 MODULES		+= drivers/mkblctrl
 MODULES		+= drivers/batt_smbus
 
+
+MODULES		+= drivers/bmp180
+
+MODULES		+= drivers/bmp280
+MODULES		+= drivers/px4flow_bl
 #
 # System commands
 #
