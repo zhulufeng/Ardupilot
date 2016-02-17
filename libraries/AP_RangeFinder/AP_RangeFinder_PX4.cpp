@@ -119,7 +119,7 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 			for (int16_t i = 0; i < numc; i++) {
 			        // read the next byte
 			        data = port->read();
-			       hal.console->printf_P(PSTR("data %d\n"),data);
+			        //hal.console->printf_P(PSTR("data %d\n"),data);
 			switch(step) {
 			 case 0:
 			      if (data == 0x55) {//judge mag frame header second byte
@@ -133,11 +133,18 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 
 	        	radar_bytes[radar_counter] = data;
 	        	check_sum += data;
-	        	if(++ radar_counter >= 13)
-	        		if(radar_bytes[12] == 1)
+	        	if(++ radar_counter >= 13){
+	        		if(radar_bytes[4] != 0x00){
 	        			step++;
-	        		else
+	        			//hal.console->printf_P(PSTR("data %d\n"),radar_bytes[4]);
+	        		}
+	        		else{
+	        			//hal.console->printf_P(PSTR("Error\n"));
 	        			step = 0;
+	        		}
+
+	        	}
+
 	        	break;
 
 		    case 2:
@@ -157,14 +164,15 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 					dist_cnt ++;
 					//hal.console->printf_P(PSTR("dist_sum %d\n"),dist_sum);
 				}
+				//hal.console->printf_P(PSTR("dist_sum %d\n"),dist_sum);
 				step = 0;
 				break;
 			}
 	   }
-		if(dist_cnt > 0)
+		if(dist_cnt >0)
 		{
 
-			dist = dist_sum * 10 / dist_cnt;
+			dist = dist_sum *10/dist_cnt;
 			ra_vel = vel_sum/(float) dist_cnt;
 			dist_time = hrt_absolute_time();
 			ret = true;
