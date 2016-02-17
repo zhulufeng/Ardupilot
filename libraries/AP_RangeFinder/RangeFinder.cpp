@@ -19,7 +19,7 @@
 #include "AP_RangeFinder_PulsedLightLRF.h"
 #include "AP_RangeFinder_MaxsonarI2CXL.h"
 #include "AP_RangeFinder_PX4.h"
-
+extern const AP_HAL::HAL& hal;
 // table of user settable parameters
 const AP_Param::GroupInfo RangeFinder::var_info[] PROGMEM = {
     // @Param: _TYPE
@@ -192,7 +192,6 @@ void RangeFinder::update(void)
             drivers[i]->update();
         }
     }
-
     // work out primary instance - first healthy sensor
     for (int8_t i=num_instances-1; i>=0; i--) {
         if (drivers[i] != NULL && state[i].healthy) {

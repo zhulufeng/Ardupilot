@@ -90,7 +90,7 @@
 
 // disable sonar on APM1 and TradHeli/APM2
 #if (CONFIG_HAL_BOARD == HAL_BOARD_APM1 || (CONFIG_HAL_BOARD == HAL_BOARD_APM2 && FRAME_CONFIG == HELI_FRAME))
- # define CONFIG_SONAR          DISABLED
+ # define CONFIG_SONAR          ENABLED
 #endif
 
 #if HAL_CPU_CLASS < HAL_CPU_CLASS_75 || CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
@@ -254,7 +254,7 @@
 #if HIL_MODE != HIL_MODE_DISABLED       // we are in HIL mode
 
  #undef CONFIG_SONAR
- #define CONFIG_SONAR DISABLED
+ #define CONFIG_SONAR ENABLED
 
 #endif
 

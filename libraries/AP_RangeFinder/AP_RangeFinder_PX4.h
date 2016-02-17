@@ -36,8 +36,12 @@ public:
     void update(void);
 
 private:
+    AP_HAL::UARTDriver *port;
     int _fd;
     uint64_t _last_timestamp;
+    uint64_t dist_time;
+    uint8_t check_sum;
+    int radar_counter;
 
     int16_t _last_max_distance_cm;
     int16_t _last_min_distance_cm;
@@ -48,6 +52,11 @@ private:
 
     // try to open the PX4 driver and return its fd
     static int open_driver(void);
+    bool read_uart_radar(void);
+    uint8_t radar_bytes[14];
+    int step;
+    uint16_t dist;
+    float ra_vel;
 };
 
 #endif // AP_RangeFinder_PX4_H
