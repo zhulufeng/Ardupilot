@@ -104,6 +104,18 @@ public:
         GPS_OK_FIX_3D_RTK = 5,  ///< Receiving valid messages and 3D lock, with relative-positioning improvements
     };
 
+    /// GPS RTK status codes
+    enum GPS_RTK_Status{
+    	NO_RTK_FIX = 0,
+    	GPS_FIX = 1,
+    	CA_DIFF = 2,
+    	RTK_FIXED = 4,
+    	RTK_FLOAT = 5,
+    	DEAD_RECKING = 6,
+    	MANUAL_INPUT = 7,
+    	SUPER_WIDE_LAND = 8,
+    };
+
     // GPS navigation engine settings. Not all GPS receivers support
     // this
     enum GPS_Engine_Setting {
@@ -127,6 +139,7 @@ public:
 
         // all the following fields must all be filled by the backend driver
         GPS_Status status;                  ///< driver fix status
+        GPS_RTK_Status RTK_status;			///<driver RTK status
         uint32_t time_week_ms;              ///< GPS time (milliseconds from start of GPS week)
         uint16_t time_week;                 ///< GPS week number
         Location location;                  ///< last fix location
@@ -138,6 +151,7 @@ public:
         bool have_vertical_velocity:1;      ///< does this GPS give vertical velocity?
         uint32_t last_gps_time_ms;          ///< the system time we got the last GPS timestamp, milliseconds
     };
+
 
     // Accessor functions
 
@@ -167,6 +181,14 @@ public:
     GPS_Status status(void) const {
         return status(primary_instance);
     }
+
+    /// Query GPS RTK status
+    GPS_RTK_Status RTK_status(uint8_t instance) const {
+		return _GPS_STATE(instance).RTK_status;
+	}
+    GPS_RTK_Status RTK_status(void) const {
+		return RTK_status(primary_instance);
+	}
 
     // Query the highest status this GPS supports
     GPS_Status highest_supported_status(uint8_t instance) const;

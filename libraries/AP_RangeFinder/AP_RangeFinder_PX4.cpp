@@ -91,15 +91,23 @@ void AP_RangeFinder_PX4::update(void)
     	state.distance_cm = dist/10;
     	 state.radar_vel = ra_vel;
     	_last_timestamp = dist_time;
+    	_last_max_distance_cm = 3000;//ranger._max_distance_cm[state.instance];
+    	_last_min_distance_cm = 90;//ranger._min_distance_cm[state.instance];
+
+    	    // consider the range finder healthy if we got a reading in the last 0.2s
+    	state.healthy = (hrt_absolute_time() - _last_timestamp < 200000);
+		state.data_valid = true;
     }
-//    hal.console->printf_P(PSTR("state.radar_vel %f\n"),ra_vel);
-//    hal.console->printf_P(PSTR("state.distance_cm %d\n"),state.distance_cm);
+    else
+    {
+    	state.healthy = (hrt_absolute_time() - _last_timestamp < 200000);
+		state.data_valid = false;
 
-     _last_max_distance_cm = 3000;//ranger._max_distance_cm[state.instance];
-     _last_min_distance_cm = 90;//ranger._min_distance_cm[state.instance];
+    }
+  //  hal.console->printf_P(PSTR("state.radar_vel %f\n"),ra_vel);
+    //hal.console->printf_P(PSTR("state.distance_cm %d\n"),state.distance_cm);
 
-    // consider the range finder healthy if we got a reading in the last 0.2s
-    state.healthy = (hrt_absolute_time() - _last_timestamp < 200000);
+
 
 
 }
@@ -113,6 +121,8 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 
 	int numc = 0;
 	uint8_t data;
+	bool data_valid = false;
+		
 	numc = port->available();
 //	hal.console->printf_P(PSTR("numc %d\n"),numc);
 	if (numc > 0) {
@@ -134,15 +144,13 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 	        	radar_bytes[radar_counter] = data;
 	        	check_sum += data;
 	        	if(++ radar_counter >= 13){
-	        		if(radar_bytes[4] != 0x00){
-	        			step++;
+					if(radar_bytes[4] != 0x00){
+						step++;
 	        			//hal.console->printf_P(PSTR("data %d\n"),radar_bytes[4]);
-	        		}
-	        		else{
-	        			//hal.console->printf_P(PSTR("Error\n"));
-	        			step = 0;
-	        		}
-
+					}
+					else{
+						step = 0;
+						}
 	        	}
 
 	        	break;
@@ -162,7 +170,9 @@ bool AP_RangeFinder_PX4::read_uart_radar(void)
 					dist_sum += ((((uint16_t)radar_bytes[1]) << 8) + (((uint16_t)radar_bytes[0])));
 					vel_sum += -(float)(( (((int32_t)radar_bytes[3]) << 24) + (((int32_t)radar_bytes[2]) << 16) )/65536);
 					dist_cnt ++;
-					//hal.console->printf_P(PSTR("dist_sum %d\n"),dist_sum);
+					//data_valid = (radar_bytes[4] == 0x00)? false:true;
+					//al.console->printf_P(PSTR("data_valid %d\n"),radar_bytes[4]);
+					//hal.console->printf_P(PSTR("dist_cnt %d\n"),dist_cnt);
 				}
 				//hal.console->printf_P(PSTR("dist_sum %d\n"),dist_sum);
 				step = 0;

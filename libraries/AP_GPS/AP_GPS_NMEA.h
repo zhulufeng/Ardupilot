@@ -135,6 +135,7 @@ private:
     int32_t _new_course;                                        ///< course parsed from a term
     uint16_t _new_hdop;                                                 ///< HDOP parsed from a term
     uint8_t _new_satellite_count;                       ///< satellite count parsed from a term
+    uint8_t _new_GPS_qual;								///satellite gps quality
 
     /// @name	Init strings
     ///			In ::init, an attempt is made to configure the GPS
@@ -151,6 +152,10 @@ private:
     static const prog_char _gprmc_string[];
     static const prog_char _gpgga_string[];
     static const prog_char _gpvtg_string[];
+    static const prog_char _gnrmc_string[];
+    static const prog_char _bdrmc_string[];
+	static const prog_char _gnvtg_string[];
+	static const prog_char _bdvtg_string[];
     //@}
 
     static const prog_char _initialisation_blob[];

@@ -190,6 +190,12 @@ void RangeFinder::update(void)
                 continue;
             }
             drivers[i]->update();
+			//hal.console->printf_P(PSTR("data_valid %d  \n"),state[i].data_valid);
+			if(state[i].data_valid)
+			{
+            	rng_update_time = hal.scheduler->millis();
+				 //hal.console->printf_P(PSTR("state[i].distance_cm %d  i: %d\n"),state[i].distance_cm,i);
+            }
         }
     }
     // work out primary instance - first healthy sensor

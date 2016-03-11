@@ -59,6 +59,7 @@ public:
                                             // if applicable, otherwise 0
         float                radar_vel; //far away is -， get close is+
         bool                   healthy;     // sensor is communicating correctly
+        bool				data_valid;//true if data is valid
     };
 
     // parameters for each instance
@@ -93,8 +94,14 @@ public:
         return _RangeFinder_STATE(instance).distance_cm;
     }
     uint16_t distance_cm() const {
-        return distance_cm(primary_instance);
+        return distance_cm(0);
     }
+    uint16_t rng_vel(uint8_t instance) const {
+            return _RangeFinder_STATE(instance).radar_vel;
+        }
+        uint16_t rng_vel() const {
+            return radar_vel(primary_instance);
+        }
 
     uint16_t voltage_mv(uint8_t instance) const {
         return _RangeFinder_STATE(instance).voltage_mv;
@@ -110,7 +117,9 @@ public:
         return radar_vel(primary_instance);
     }
 
-
+    uint32_t get_rng_update_time() const{
+    	return rng_update_time;
+    }
 
     int16_t max_distance_cm(uint8_t instance) const {
         return _max_distance_cm[instance];
@@ -138,6 +147,7 @@ private:
     AP_RangeFinder_Backend *drivers[RANGEFINDER_MAX_INSTANCES];
     uint8_t primary_instance:1;
     uint8_t num_instances:1;
+    uint32_t rng_update_time;
 
     void detect_instance(uint8_t instance);
     void update_instance(uint8_t instance);  

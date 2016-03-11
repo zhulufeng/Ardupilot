@@ -27,8 +27,6 @@
 
 #define BARO_GLITCH_ACCEL_MAX_CMSS  100.0f // vehicle can accelerate at up to 1m/s/s vertically
 #define BARO_GLITCH_DISTANCE_OK_CM  50.0f  // baro movement within 0.5m of current position is always ok
-#define bubble_sort_count_rng_alt  5
-#define bubble_sort_count_rng_alt_vel  5
 
 /*
  * AP_InertialNav blends accelerometer data with gps and barometer data to improve altitude and position hold.
@@ -205,15 +203,6 @@ public:
      */
     void        ignore_next_error() { _flags.ignore_error = 7; }
 
-	void set_and_save_time_constant_z(float value){
-		_time_constant_z = value;
-		_time_constant_z.save();
-	}
-	void set_and_save_time_constant_xy(float value){
-		_time_constant_xy = value;
-		_time_constant_xy.save();
-	}
-
     // class level parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -229,7 +218,7 @@ protected:
      * @param lon : longitude in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
      * @param lat : latitude  in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
      */
-    void        correct_with_gps(uint32_t now, int32_t lon, int32_t lat);
+    void        correct_with_gps(uint32_t now, int32_t lon, int32_t lat,int32_t alt,bool flag_RTK_FIXED);
 
     /**
      * check_gps - checks if new gps readings have arrived and calls correct_with_gps to
@@ -305,6 +294,7 @@ protected:
     uint8_t                 _historic_xy_counter;       // counter used to slow saving of position estimates for later comparison to gps
     AP_BufferFloat_Size5    _hist_position_estimate_x;  // buffer of historic accel based position to account for gpslag
     AP_BufferFloat_Size5    _hist_position_estimate_y;  // buffer of historic accel based position to account for gps lag
+    AP_BufferFloat_Size5    _hist_gps_position_estimate_z;  // buffer of historic accel based position to account for gps lag
     float                   _lon_to_cm_scaling;         // conversion of longitude to centimeters
 
     // Z Axis specific variables
@@ -330,31 +320,10 @@ protected:
 	bool 					rng_valid;
 	float 					_rng_alt;
 	float					_rng_alt_vel;
-	uint32_t                rngValidMeaTime_ms;
-	bool 					newDataRng;
-	uint32_t					rngOnGnd;
-	float 					baroHgtOffset;
-	float						_rng_alt_filtered;				
-	float						_rng_alt_vel_filtered;	
-
-	float sonar_values[5] = { 0.0f };
-	unsigned insert_index = 0;
-	
-	void sonar_bubble_sort(float sonar_values[], unsigned n);
-	float insert_sonar_value_and_get_mode_value(float insert);
-
-	
-	 struct LowPassStruct_t{
-	 
-		 float _cutoff_freq;
-		 float _a1,_a2,_b0,_b1,_b2;
-		 float _delay_element_1;
-		 float _delay_element_2;
-	 } LPF[2]; ;
-	 
-	 void  lpf_set_cutoff_frequency(LowPassStruct_t *lpf,float sample_freq, float cutoff_freq);
-	 float lpf_apply(LowPassStruct_t *lpf,float sample);
-	 float lpf_reset(LowPassStruct_t *lpf,float sample);
+	uint32_t                 rngValidMeaTime_ms;
+	 bool 						newDataRng;
+	 uint32_t					rngOnGnd;
+	 float 					baroHgtOffset;
 
 };
 

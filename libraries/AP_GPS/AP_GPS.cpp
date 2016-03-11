@@ -155,6 +155,7 @@ AP_GPS::detect_instance(uint8_t instance)
 		}
 		uint32_t baudrate = pgm_read_dword(&_baudrates[dstate->last_baud]);
 		port->begin(baudrate, 256, 16);		
+
 		dstate->last_baud_change_ms = now;
         send_blob_start(instance, _initialisation_blob, sizeof(_initialisation_blob));
     }
@@ -174,6 +175,7 @@ AP_GPS::detect_instance(uint8_t instance)
             pgm_read_dword(&_baudrates[dstate->last_baud]) >= 38400 && 
             AP_GPS_UBLOX::_detect(dstate->ublox_detect_state, data)) {
             hal.console->print_P(PSTR(" ublox "));
+        	hal.console->printf("ublox gps!\n");
             new_gps = new AP_GPS_UBLOX(*this, state[instance], port);
         } 
 		else if ((_type[instance] == GPS_TYPE_AUTO || _type[instance] == GPS_TYPE_MTK19) &&
@@ -198,11 +200,13 @@ AP_GPS::detect_instance(uint8_t instance)
 		else if ((_type[instance] == GPS_TYPE_AUTO || _type[instance] == GPS_TYPE_SIRF) &&
                  AP_GPS_SIRF::_detect(dstate->sirf_detect_state, data)) {
 			hal.console->print_P(PSTR(" SIRF "));
+	    	hal.console->printf("baudrate is SIRF!\n");
 			new_gps = new AP_GPS_SIRF(*this, state[instance], port);
 		}
 		else if (now - dstate->detect_started_ms > 5000) {
 			// prevent false detection of NMEA mode in
 			// a MTK or UBLOX which has booted in NMEA mode
+
 			if ((_type[instance] == GPS_TYPE_AUTO || _type[instance] == GPS_TYPE_NMEA) &&
                 AP_GPS_NMEA::_detect(dstate->nmea_detect_state, data)) {
 				hal.console->print_P(PSTR(" NMEA "));
@@ -275,13 +279,15 @@ AP_GPS::highest_supported_status(void) const
 void
 AP_GPS::update_instance(uint8_t instance)
 {
-    if (_type[instance] == GPS_TYPE_HIL) {
+
+	if (_type[instance] == GPS_TYPE_HIL) {
         // in HIL, leave info alone
         return;
     }
     if (_type[instance] == GPS_TYPE_NONE) {
         // not enabled
         state[instance].status = NO_GPS;
+
         return;
     }
     if (locked_ports & (1U<<instance)) {
@@ -330,7 +336,8 @@ AP_GPS::update_instance(uint8_t instance)
 void
 AP_GPS::update(void)
 {
-    for (uint8_t i=0; i<GPS_MAX_INSTANCES; i++) {
+
+	for (uint8_t i=0; i<GPS_MAX_INSTANCES; i++) {
         update_instance(i);
     }
 

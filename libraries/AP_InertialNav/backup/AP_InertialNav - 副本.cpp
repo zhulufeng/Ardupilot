@@ -4,7 +4,6 @@
 
 extern const AP_HAL::HAL& hal;
 
-
 // table of user settable parameters
 const AP_Param::GroupInfo AP_InertialNav::var_info[] PROGMEM = {
     // start numbering at 1 because 0 was previous used for body frame accel offsets
@@ -25,17 +24,15 @@ const AP_Param::GroupInfo AP_InertialNav::var_info[] PROGMEM = {
     AP_GROUPEND
 };
 
+
+
+
 // init - initialise library
 void AP_InertialNav::init()
 {
     // recalculate the gains
     update_gains();
 	rng_valid = false;
-	for(int i=0;i<3;i++)
-    {
-       lpf_set_cutoff_frequency(&LPF[i],40, 5);
-       lpf_reset(&LPF[i],0);
-    }
 }
 
 // update - updates velocities and positions using latest info from ahrs and barometer if new data is available;
@@ -114,13 +111,16 @@ void AP_InertialNav::update(float dt)
 
     // calculate new velocity
     _velocity += velocity_increase;
-	if(loop == 20){
-		//hal.uartC->printf("rng_alt1:%d,rng_alt2:%f,inav_alt:%f,rng_vel:%f,inav_vel:%f,glich:%d\n", _sonar.distance_cm(), _rng_alt, _position.z, _sonar.rng_vel() * _ahrs.cos_roll() * _ahrs.cos_pitch(), _velocity.z, _flags_rng_glitching);
-			hal.console->printf_P(PSTR("position.z %f\n"),(float)_position.z);
+	if(loop == 10){
+		hal.console->printf_P(PSTR("position.z:  %f\t"),_position.z);
+		hal.console->printf_P(PSTR("rng_alt in update %f\n"),(float)_rng_alt);
+		//hal.console->printf_P(PSTR("_position_base.z:  %f\t"),_position_base.z);
+		//hal.console->printf_P(PSTR("_position_correction.z:  %f\n"),_position_correction.z);
 		loop = 0;
-	}
+		}
     // store 3rd order estimate (i.e. estimated vertical position) for future use
     _hist_position_estimate_z.push_back(_position_base.z);
+	_hist_gps_position_estimate_z.push_back(_position_base.z);
 
     // store 3rd order estimate (i.e. horizontal position) for future use at 10hz
     _historic_xy_counter++;
@@ -145,11 +145,13 @@ bool AP_InertialNav::position_ok() const
 void AP_InertialNav::check_gps()
 {
     const uint32_t now = hal.scheduler->millis();
+    bool flag_RTK_FIXED = false;
     // compare gps time to previous reading
     const AP_GPS &gps = _ahrs.get_gps();
     if(gps.last_fix_time_ms() != _gps_last_time ) {
+    	flag_RTK_FIXED = (gps.RTK_status() == AP_GPS::RTK_FIXED);
         // call position correction method
-        correct_with_gps(now, gps.location().lng, gps.location().lat);
+        correct_with_gps(now, gps.location().lng, gps.location().lat,gps.location().alt,flag_RTK_FIXED);
 
         // record gps time and system time of this update
         _gps_last_time = gps.last_fix_time_ms();
@@ -158,6 +160,7 @@ void AP_InertialNav::check_gps()
         if (now - _gps_last_update > AP_INTERTIALNAV_GPS_TIMEOUT_MS) {
             _position_error.x *= 0.9886f;
             _position_error.y *= 0.9886f;
+           // _position_error.z *= 0.9886f;
             // increment error count
             if (_flags.ignore_error == 0 && _error_count < 255 && _xy_enabled) {
                 _error_count++;
@@ -167,11 +170,11 @@ void AP_InertialNav::check_gps()
 }
 
 // correct_with_gps - modifies accelerometer offsets using gps
-void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat)
+void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat,int32_t alt,bool flag_RTK_FIXED)
 {
-    float dt,x,y;
-    float hist_position_base_x, hist_position_base_y;
-
+    float dt,x,y,z;
+    float hist_position_base_x, hist_position_base_y,hist_position_base_z;
+    static uint8_t first_reads = 0;
 
     // calculate time since last gps reading
     dt = (float)(now - _gps_last_update) * 0.001f;
@@ -187,12 +190,17 @@ void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat)
     // calculate distance from base location
     x = (float)(lat - _ahrs.get_home().lat) * LATLON_TO_CM;
     y = (float)(lon - _ahrs.get_home().lng) * _lon_to_cm_scaling;
+    z = (float)(alt - _ahrs.get_home().alt);
+
+	hal.uartC->printf("x:%f,y:%f,z:%f\n",x,y,z);
+	hal.uartC->printf("posx:%f,posy:%f,posz:%f\n",_position.x,_position.y,_position.z);
 
     // sanity check the gps position.  Relies on the main code calling GPS_Glitch::check_position() immediatley after a GPS update
     if (_glitch_detector.glitching()) {
         // failed sanity check so degrate position_error to 10% over 2 seconds (assumes 5hz update rate)
         _position_error.x *= 0.7943f;
         _position_error.y *= 0.7943f;
+        _position_error.z *= 0.7943f;
     }else{
         // if our internal glitching flag (from previous iteration) is true we have just recovered from a glitch
         // reset the inertial nav position and velocity to gps values
@@ -206,14 +214,25 @@ void AP_InertialNav::correct_with_gps(uint32_t now, int32_t lon, int32_t lat)
             if( _hist_position_estimate_x.is_full()) {
                 hist_position_base_x = _hist_position_estimate_x.front();
                 hist_position_base_y = _hist_position_estimate_y.front();
+                hist_position_base_z = _hist_gps_position_estimate_z.front();
             }else{
                 hist_position_base_x = _position_base.x;
                 hist_position_base_y = _position_base.y;
+                hist_position_base_z = _position_base.z;
             }
 
             // calculate error in position from gps with our historical estimate
             _position_error.x = x - (hist_position_base_x + _position_correction.x);
             _position_error.y = y - (hist_position_base_y + _position_correction.y);
+            if(flag_RTK_FIXED && false){
+			// discard first 10 reads but perform some initialisation
+			
+			if( first_reads <= 10 ) {
+				set_altitude(z);
+				first_reads++;
+			}
+            _position_error.z = z - (hist_position_base_z + _position_correction.z);
+            }
         }
     }
 
@@ -252,15 +271,17 @@ void AP_InertialNav::setup_home_position(void)
     // reset corrections to base position to zero
     _position_base.x = 0.0f;
     _position_base.y = 0.0f;
+    _position_base.z = 0.0f;
     _position_correction.x = 0.0f;
     _position_correction.y = 0.0f;
+    _position_correction.z = 0.0f;
     _position.x = 0.0f;
     _position.y = 0.0f;
-
+    _position.z = 0.0f;
     // clear historic estimates
     _hist_position_estimate_x.clear();
     _hist_position_estimate_y.clear();
-
+    _hist_gps_position_estimate_z.clear();
     // set xy as enabled
     _xy_enabled = true;
 }
@@ -372,6 +393,7 @@ void AP_InertialNav::set_altitude( float new_altitude)
     _position_correction.z = 0;
     _position.z = new_altitude; // _position = _position_base + _position_correction
     _hist_position_estimate_z.clear(); // reset z history to avoid fake z velocity at next baro calibration (next rearm)
+    _hist_gps_position_estimate_z.clear(); // reset z history to avoid fake z velocity at next baro calibration (next rearm)
 }
 
 //
@@ -394,6 +416,7 @@ void AP_InertialNav::update_gains()
     if (_time_constant_z == 0.0f) {
         _k1_z = _k2_z = _k3_z = 0.0f;
     }else{
+    	_time_constant_z = 3.0;
         _k1_z = 3.0f / _time_constant_z;
         _k2_z = 3.0f / (_time_constant_z*_time_constant_z);
         _k3_z = 1.0f / (_time_constant_z*_time_constant_z*_time_constant_z);
@@ -443,9 +466,8 @@ void AP_InertialNav::check_rng_glitch()
     // if not initialised or disabled update last good alt and exit
     if (!_flags_rng_initialised) {
         _last_good_update = now;
-        _last_good_alt = _rng_alt_filtered;
-		_last_good_vel = _rng_alt_vel_filtered;
-        //_last_good_vel = get_rng_climb_rate();
+        _last_good_alt = _sonar.distance_cm();
+        _last_good_vel = get_rng_climb_rate();
         _flags_rng_initialised = true;
         _flags_rng_glitching = false;
         return;
@@ -458,13 +480,13 @@ void AP_InertialNav::check_rng_glitch()
     alt_projected = _last_good_alt + (_last_good_vel * sane_dt);
 
     // calculate distance from recent baro alt to current estimate
-    int32_t rng_alt = (int)(_rng_alt_filtered);
-    int32_t rng_vel = (int)(_rng_alt_vel_filtered);
+    int32_t rng_alt = (int)(_rng_alt);
+    int32_t rng_vel = (int)(_rng_alt_vel);
     // calculte distance from projected distance
     distance_cm = labs(alt_projected - rng_alt);
 
     // all ok if within a given hardcoded radius
-    if (distance_cm <= BARO_GLITCH_DISTANCE_OK_CM * 2) {
+    if (distance_cm <= BARO_GLITCH_DISTANCE_OK_CM) {
         all_ok = true;
     }else{
         // or if within the maximum distance we could have moved based on our acceleration
@@ -476,21 +498,21 @@ void AP_InertialNav::check_rng_glitch()
     if (all_ok) {
         // position is acceptable
         _last_good_update = now;
-		_last_good_alt = _rng_alt_filtered;
-		_last_good_vel = _rng_alt_vel_filtered;
-
-       // _last_good_vel = get_rng_climb_rate();
+        _last_good_alt = rng_alt;
+        _last_good_vel = get_rng_climb_rate();
     }
 
     // update glitching flag
     _flags_rng_glitching = !all_ok;
-	hal.console->printf_P("distance_cm:\t%d  _flags_rng_glitching: %d \n",distance_cm,_flags_rng_glitching?999:888);
+	hal.console->printf_P(PSTR("_flags_rng_glitching: %d\n"),_flags_rng_glitching);
 
 }
 
 void AP_InertialNav::correct_with_rng(float rng_alt, float dt)
 {
     static uint8_t first_reads = 0;
+
+	
 
     // discard samples where dt is too large
     if( dt > 0.5f ) {
@@ -512,7 +534,7 @@ void AP_InertialNav::correct_with_rng(float rng_alt, float dt)
         // if our internal baro glitching flag (from previous iteration) is true we have just recovered from a glitch
         // reset the inertial nav alt to baro alt
         if (_flags_rng_glitching_internal) {
-            set_altitude(rng_alt);
+
             _position_error.z = 0.0f;
         }else{
             // 3rd order samples (i.e. position from baro) are delayed by 150ms (15 iterations at 100hz)
@@ -527,14 +549,14 @@ void AP_InertialNav::correct_with_rng(float rng_alt, float dt)
             // calculate error in position from baro with our estimate
             _position_error.z = rng_alt * _ahrs.cos_roll() * _ahrs.cos_pitch() - (hist_position_base_z + _position_correction.z);
 			//hal.console->printf_P(PSTR("rng_alt %f\n"),(float)rng_alt);
-			baroHgtOffset = 0.1f * (_baro.get_altitude() *100.0f - _position.z) + 0.9f * baroHgtOffset;
+			hal.console->printf_P(PSTR("_ahrs.cos_roll %f    _ahrs.cos_roll   %f\n"),_ahrs.cos_roll(),_ahrs.cos_pitch());
+			baroHgtOffset = 0.1f * (_baro.get_altitude() *100.0f + _position.z) + 0.9f * baroHgtOffset;
         }
     }
 
     // update our internal record of glitching flag so that we can notice a change
     _flags_rng_glitching_internal = _flags_rng_glitching;
 }
-
 // return current climb_rate estimeate relative to time that calibrate()
 // was called. Returns climb rate in meters/s, positive means up
 // note that this relies on read() being called regularly to get new data
@@ -549,35 +571,31 @@ void AP_InertialNav::rng_inav_check()
 {
     static uint32_t _rng_last_update;
     const uint32_t now = hal.scheduler->millis();
-	//readRangeFinder();
-	//_rng_alt_filtered = insert_sonar_value_and_get_mode_value(_rng_alt);
-	//_rng_alt_vel_filtered = insert_sonar_value_and_get_mode_value(_rng_alt_vel);
-	_rng_alt_filtered = 0.05*(_sonar.distance_cm()) + 0.95 * _rng_alt_filtered;
-	_rng_alt_vel_filtered = 0.05*(_sonar.radar_vel()) + 0.95 * _rng_alt_vel_filtered;
-	 hal.console->printf_P(PSTR("_rng_alt_filtered %f\n"),(float)_rng_alt_filtered);
-	hal.console->printf_P(PSTR("_baro.get_altitude %f\n"),(float)_baro.get_altitude());
-	//_rng_alt_filtered=lpf_apply(&LPF[0],_rng_alt);
-	//_rng_alt_vel_filtered = lpf_apply(&LPF[1],_rng_alt_vel);
+	readRangeFinder();
+
     if(_rng_last_update != _sonar.get_rng_update_time() && newDataRng) {
         const float dt = (float)(_sonar.get_rng_update_time() - _rng_last_update) * 0.001f; // in seconds
         _rng_last_update = _sonar.get_rng_update_time();
         // call correction method
         _climb_rate_filter.update((float)_sonar.distance_cm(), _rng_last_update);
         check_rng_glitch();
-        correct_with_rng(_rng_alt_filtered, dt);
+        correct_with_rng(_rng_alt, dt);
 		rng_valid = true;
-		_time_constant_z = 2.0f;
-		update_gains();
+		
     }
-
-	if (now - _rng_last_update > AP_INTERTIALNAV_RNG_TIMEOUT_MS)
-	{
-		rng_valid = false;
-		_time_constant_z.load();
-		update_gains();
-	}
+    else
+    {
+    	/*if (now - _rng_last_update > AP_INTERTIALNAV_GPS_TIMEOUT_MS) {
+            _position_error.z *= 0.8f;
+			rng_valid = true;
+            // Debug("RNG data updates stop arriving\n");
+        }*/
+		if (now - _rng_last_update > AP_INTERTIALNAV_RNG_TIMEOUT_MS)
+			{
+				rng_valid = false;
+			}
+    }
 }
-
 void AP_InertialNav::readRangeFinder(void)
 {
    static float storedRngMeas[3];
@@ -599,7 +617,7 @@ void AP_InertialNav::readRangeFinder(void)
 	   }
 	   storedRngMeasTime_ms[rngMeasIndex] = last_update_time;
 	   storedRngMeas[rngMeasIndex] = (float)_sonar.distance_cm();
-	   storedRngVel[rngMeasIndex] = _sonar.rng_vel();
+	   storedRngVel[rngMeasIndex] = (float)_sonar.radar_vel();
 	   // check for three fresh samples and take median
 	   bool sampleFresh[3];
 	   for (uint8_t index = 0; index <= 2; index++) {
@@ -636,13 +654,13 @@ void AP_InertialNav::readRangeFinder(void)
 		   } else {
 			   midIndex = 2;
 		   }
-		   _rng_alt= max(storedRngMeas[midIndex],rngOnGnd) ;
-		   _rng_alt_vel = storedRngVel[midIndex] ;
+		   _rng_alt= max(storedRngMeas[midIndex],rngOnGnd)* _ahrs.cos_roll() * _ahrs.cos_pitch() ;
+		   _rng_alt_vel = storedRngVel[midIndex] * _ahrs.cos_roll() * _ahrs.cos_pitch() ;
 		   newDataRng = true;
 		   rngValidMeaTime_ms = last_update_time;
-		  
-		   //hal.console->printf_P(PSTR("rng_alt_vel %f\n"),(float)_rng_alt_vel);
-		   //hal.uartC->printf("rng_alt:%f", (float)_rng_alt);
+		   hal.console->printf_P(PSTR("rng_alt %f\t"),(float)_rng_alt);
+		   hal.console->printf_P(PSTR("rng_alt_vel %f\n"),(float)_rng_alt_vel);
+		   hal.uartE->printf("");
 		   // recall vehicle states at mid sample time for range finder
 		   //RecallStates(statesAtRngTime, storedRngMeasTime_ms[midIndex] - 25);
 	   }
@@ -656,104 +674,10 @@ void AP_InertialNav::readRangeFinder(void)
 		   // assume synthetic measurement is at current time (no delay)
 		   //statesAtRngTime = state;
 	   } else {
-	   hal.console->printf_P(PSTR("rng_alt in false %f\t"),(float)_rng_alt);
 		   newDataRng = false;
 	   }
 	   lastRngMeasTime_ms =  last_update_time;
    }
 
 }
-
-void AP_InertialNav:: lpf_set_cutoff_frequency(LowPassStruct_t *lpf, float sample_freq, float cutoff_freq)
-{
-      lpf->_cutoff_freq = cutoff_freq;
-      if (lpf->_cutoff_freq <= 0.0f) {
-      // no filtering
-      return;
-      }
-      float fr = sample_freq/lpf->_cutoff_freq;
-      float ohm = tanf(M_PI/fr);
-      float c = 1.0f+2.0f*cosf(M_PI/4.0f)*ohm + ohm*ohm;
-      lpf->_b0 = ohm*ohm/c;
-      lpf->_b1 = 2.0f*lpf->_b0;
-      lpf->_b2 = lpf->_b0;
-      lpf->_a1 = 2.0f*(ohm*ohm-1.0f)/c;
-      lpf->_a2 = (1.0f-2.0f*cosf(M_PI/4.0f)*ohm+ohm*ohm)/c;
-}
-
-float AP_InertialNav:: lpf_apply(LowPassStruct_t *lpf,float sample)
-{
-      if (lpf->_cutoff_freq <= 0.0f) {
-             // no filtering
-          return sample;
-      }
-      // do the filtering
-      float delay_element_0 = sample - lpf->_delay_element_1 * lpf->_a1 - lpf->_delay_element_2 * lpf->_a2;
-      if (isnan(delay_element_0) || isinf(delay_element_0)) {
-         // don't allow bad values to propagate via the filter
-         delay_element_0 = sample;
-      }
-      float output = delay_element_0 * lpf->_b0 + lpf->_delay_element_1 * lpf->_b1 + lpf->_delay_element_2 * lpf->_b2;
-
-
-      lpf->_delay_element_2 = lpf->_delay_element_1;
-      lpf->_delay_element_1 = delay_element_0;
-
-      // return the value.  Should be no need to check limits
-       return output;
-}
- 
-float AP_InertialNav:: lpf_reset(LowPassStruct_t *lpf, float sample) {
-	   lpf->_delay_element_1 = lpf->_delay_element_2 = sample;
-	   return lpf_apply(lpf,sample);
- }
-
- /**
-  * insert-only ring buffer of sonar data, needs to be of uneven size
-  * the initialization to zero will make the filter respond zero for the
-  * first three inserted readinds, which is a decent startup-logic.
-  */
-
- 
- void AP_InertialNav:: sonar_bubble_sort(float sonar_values[], unsigned n)
- {
-	 float t;
- 
-	 for (unsigned i = 0; i < (n - 1); i++) {
-		 for (unsigned j = 0; j < (n - i - 1); j++) {
-			 if (sonar_values[j] > sonar_values[j+1]) {
-				 /* swap two values */
-				 t = sonar_values[j];
-				 sonar_values[j] = sonar_values[j + 1];
-				 sonar_values[j + 1] = t;
-			 }
-		 }
-	 }
- }
- 
- float AP_InertialNav:: insert_sonar_value_and_get_mode_value(float insert)
- {
-	 const unsigned sonar_count = sizeof(sonar_values) / sizeof(sonar_values[0]);
- 
-	 sonar_values[insert_index] = insert;
-	 insert_index++;
-	 if (insert_index == sonar_count) {
-		 insert_index = 0;
-	 }
- 
-	 /* sort and return mode */
- 
-	 /* copy ring buffer */
-	 float sonar_temp[sonar_count];
-	 memcpy(sonar_temp, sonar_values, sizeof(sonar_values));
- 
-	 sonar_bubble_sort(sonar_temp, sonar_count);
- 
-	 /* the center element represents the mode after sorting */
-	 return sonar_temp[sonar_count / 2];
- }
-
-
- 
- 
 

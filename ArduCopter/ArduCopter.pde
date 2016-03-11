@@ -326,10 +326,10 @@ static GCS_MAVLINK gcs[MAVLINK_COMM_NUM_BUFFERS];
 
 ////////////////////////////////////////////////////////////////////////////////
 // SONAR
-#if CONFIG_SONAR == ENABLED
+//#if CONFIG_SONAR == ENABLED
 static RangeFinder sonar;
 static bool sonar_enabled = true; // enable user switch for sonar
-#endif
+//#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // User variables
@@ -625,9 +625,9 @@ static float G_Dt = 0.02;
 // Inertial Navigation
 ////////////////////////////////////////////////////////////////////////////////
 #if AP_AHRS_NAVEKF_AVAILABLE
-static AP_InertialNav_NavEKF inertial_nav(ahrs, barometer, gps_glitch, baro_glitch);
+static AP_InertialNav_NavEKF inertial_nav(ahrs, barometer, gps_glitch, baro_glitch,sonar);
 #else
-static AP_InertialNav inertial_nav(ahrs, barometer, gps_glitch, baro_glitch);
+static AP_InertialNav inertial_nav(ahrs, barometer, gps_glitch, baro_glitch,sonar);
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////
