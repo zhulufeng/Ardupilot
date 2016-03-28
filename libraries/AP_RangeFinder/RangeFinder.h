@@ -40,15 +40,16 @@ public:
 
     // RangeFinder driver types
     enum RangeFinder_Type {
-        RangeFinder_TYPE_NONE   = 0,
-        RangeFinder_TYPE_ANALOG = 1,
-        RangeFinder_TYPE_MBI2C  = 2,
-        RangeFinder_TYPE_PLI2C  = 3,
-        RangeFinder_TYPE_PX4    = 4,
-        RangeFinder_TYPE_PX4_PWM= 5,
-        RangeFinder_TYPE_BBB_PRU= 6,
-        RangeFinder_TYPE_LWI2C  = 7,
-        RangeFinder_TYPE_LWSER  = 8
+        RangeFinder_TYPE_NONE     = 0,
+        RangeFinder_TYPE_ANALOG   = 1,
+        RangeFinder_TYPE_MBI2C    = 2,
+        RangeFinder_TYPE_PLI2C    = 3,
+        RangeFinder_TYPE_PX4      = 4,
+        RangeFinder_TYPE_PX4_PWM  = 5,
+        RangeFinder_TYPE_BBB_PRU  = 6,
+        RangeFinder_TYPE_LWI2C    = 7,
+        RangeFinder_TYPE_LWSER    = 8,
+        RangeFinder_Type_Lidar804 = 9
     };
 
     enum RangeFinder_Function {
@@ -69,6 +70,7 @@ public:
     struct RangeFinder_State {
         uint8_t                instance;    // the instance number of this RangeFinder
         uint16_t               distance_cm; // distance: in cm
+        int16_t                velvelocity_cm;//velocity: in cm/s
         uint16_t               voltage_mv;  // voltage in millivolts,
                                             // if applicable, otherwise 0
         enum RangeFinder_Status status;     // sensor status

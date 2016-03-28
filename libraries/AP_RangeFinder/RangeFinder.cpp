@@ -13,7 +13,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <AP_HAL/AP_HAL.h>
 #include "RangeFinder.h"
 #include "AP_RangeFinder_analog.h"
 #include "AP_RangeFinder_PulsedLightLRF.h"
@@ -23,7 +23,9 @@
 #include "AP_RangeFinder_BBB_PRU.h"
 #include "AP_RangeFinder_LightWareI2C.h"
 #include "AP_RangeFinder_LightWareSerial.h"
+#include "AP_RangeFinder_Lidar804.h"
 
+extern const AP_HAL::HAL& hal;
 // table of user settable parameters
 const AP_Param::GroupInfo RangeFinder::var_info[] = {
     // @Param: _TYPE
@@ -420,6 +422,7 @@ void RangeFinder::init(void)
         return;
     }
     for (uint8_t i=0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+        hal.console -> printf_P("type : start %d \n",888);
         detect_instance(i);
         if (drivers[i] != NULL) {
             // we loaded a driver for this instance, so it must be
@@ -470,11 +473,13 @@ void RangeFinder::update(void)
 void RangeFinder::detect_instance(uint8_t instance)
 {
     uint8_t type = _type[instance];
+    hal.console -> printf_P("type : %d \n", type);
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
     if (type == RangeFinder_TYPE_PLI2C || 
         type == RangeFinder_TYPE_MBI2C) {
         // I2C sensor types are handled by the PX4Firmware code
         type = RangeFinder_TYPE_PX4;
+        hal.console -> printf_P("type :  %d  instance: %d \n", type,instance);
     }
 #endif
     if (type == RangeFinder_TYPE_PLI2C) {
@@ -539,6 +544,15 @@ void RangeFinder::detect_instance(uint8_t instance)
             return;
         }
     }
+    if (type == RangeFinder_Type_Lidar804) {
+        if (AP_RangeFinder_Lidar804::detect(*this, instance, serial_manager)) {
+            state[instance].instance = instance;
+            drivers[instance] = new AP_RangeFinder_Lidar804(*this, instance, state[instance], serial_manager);
+            hal.console -> printf_P("type :  %d  instance: %d \n", type,instance);
+            return;
+        }
+    } 
+
 }
 
 // query status
