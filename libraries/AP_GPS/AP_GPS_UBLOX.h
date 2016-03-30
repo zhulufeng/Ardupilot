@@ -101,7 +101,7 @@ private:
         uint8_t msg_id;
         uint8_t rate;
     };
-    struct PACKED ubx_cfg_nav_settings {
+     struct PACKED ubx_cfg_nav_settings {
         uint16_t mask;
         uint8_t dynModel;
         uint8_t fixMode;
@@ -114,10 +114,36 @@ private:
         uint16_t pAcc;
         uint16_t tAcc;
         uint8_t staticHoldThresh;
-        uint8_t res1;
-        uint32_t res2;
-        uint32_t res3;
-        uint32_t res4;
+        uint8_t dgpsTimeOut;
+        uint8_t cnoThreshNumSVs;
+        uint8_t cnoThresh;
+        uint8_t reserved1[2];
+        uint16_t staticHoldMaxDist;
+        uint8_t utcStandard;
+        uint8_t reserved2[5];
+    };
+
+    struct PACKED ubx_cfg_navx5_settings {
+        uint16_t version;
+        uint16_t mask1;
+        uint32_t mask2;
+        uint8_t reserved1[2];
+        uint8_t minSVs;
+        uint8_t maxSVs;
+        uint8_t minCNO;
+        uint8_t reserved2;
+        uint8_t iniFix3D;
+        uint8_t reserved3[2];
+        uint8_t ackAiding;
+        uint16_t wknRollover;
+        uint8_t reserved4[6];
+        uint8_t usePPP;
+        uint8_t aopCfg;
+        uint8_t reserved5[2];
+        uint16_t aopOrbMaxErr;
+        uint8_t reserved6[4];
+        uint8_t reserved7[3];
+        uint8_t useAdr;
     };
     struct PACKED ubx_cfg_sbas {
         uint8_t mode;
@@ -330,6 +356,7 @@ private:
         MSG_CFG_RATE = 0x08,
         MSG_CFG_SET_RATE = 0x01,
         MSG_CFG_NAV_SETTINGS = 0x24,
+        MSG_CFG_NAVX5_SETTINGS = 0X23,
         MSG_CFG_SBAS = 0x16,
         MSG_CFG_GNSS = 0x3E,
         MSG_MON_HW = 0x09,

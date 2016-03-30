@@ -82,7 +82,7 @@ AP_GPS_UBLOX::send_next_rate_update(void)
 
     switch (rate_update_step++) {
     case 0:
-        _configure_navigation_rate(200);
+        _configure_navigation_rate(100);
         break;
     case 1:
         _configure_message_rate(CLASS_NAV, MSG_POSLLH, 1); // 28+8 bytes
@@ -453,7 +453,7 @@ AP_GPS_UBLOX::_parse_gps(void)
             Debug("  %u %u %u 0x%08x\n",
             (unsigned)_buffer.gnss.configBlock[i].gnssId,
             (unsigned)_buffer.gnss.configBlock[i].resTrkCh,
-            (unsigned)_buffer.gnss.configBlock[i].maxTrkCh,
+            (unsigned)g.gnss.configBlock[i].maxTrkCh,
             (unsigned)_buffer.gnss.configBlock[i].flags);
         }
 #endif
@@ -758,7 +758,7 @@ AP_GPS_UBLOX::_configure_message_rate(uint8_t msg_class, uint8_t msg_id, uint8_t
     struct ubx_cfg_msg_rate msg;
     msg.msg_class = msg_class;
     msg.msg_id    = msg_id;
-    msg.rate          = rate;
+    msg.rate      = rate;
     _send_message(CLASS_CFG, MSG_CFG_SET_RATE, &msg, sizeof(msg));
 }
 
@@ -782,13 +782,57 @@ void
 AP_GPS_UBLOX::_configure_gps(void)
 {
     // start the process of updating the GPS rates
+    struct ubx_cfg_nav_settings nav_msg;
+    struct ubx_cfg_navx5_settings navx5_msg;
+ 
+    nav_msg.mask              = 0x0507;
+    nav_msg.dynModel          = 8;
+    nav_msg.fixMode           = 3;
+    nav_msg.fixedAlt          = 100;
+    nav_msg.fixedAltVar       = 10;
+    nav_msg.minElev           = 5;
+    nav_msg.drLimit           = 0;
+    nav_msg.pDop              = 10;
+    nav_msg.tDop              = 10;
+    nav_msg.pAcc              = 100;
+    nav_msg.tAcc              = 300;
+    nav_msg.staticHoldThresh  = 200;
+    nav_msg.dgpsTimeOut       = 60;
+    nav_msg.cnoThreshNumSVs   = 4;
+    nav_msg.cnoThresh         = 30;
+    nav_msg.reserved1[0]      = 0;
+    nav_msg.reserved1[1]      = 0;
+    nav_msg.staticHoldMaxDist = 200;
+    nav_msg.utcStandard       = 0;
+    nav_msg.reserved2[0]      = 0;
+    nav_msg.reserved2[1]      = 0;
+    nav_msg.reserved2[2]      = 0;
+    nav_msg.reserved2[3]      = 0;
+    nav_msg.reserved2[4]      = 0;
+
+    navx5_msg.mask1          = 0xFFFF;
+    navx5_msg.mask2          = 0x1F;
+    navx5_msg.minSVs         = 3;
+    navx5_msg.maxSVs         = 20;
+    navx5_msg.minCNO         = 25;
+    navx5_msg.iniFix3D       = 1;
+    navx5_msg.wknRollover    = 1756;
+    navx5_msg.usePPP         = 0;
+    navx5_msg.aopCfg         = 0;
+    navx5_msg.aopOrbMaxErr   = 100;
+    navx5_msg.useAdr         = 0;
+
+
     need_rate_update = true;
     _last_5hz_time = hal.scheduler->millis();
     rate_update_step = 0;
 
     // ask for the current navigation settings
 	Debug("Asking for engine setting\n");
+    _send_message(CLASS_CFG, MSG_CFG_NAV_SETTINGS, &nav_msg, sizeof(nav_msg));
+    _send_message(CLASS_CFG, MSG_CFG_NAVX5_SETTINGS, &navx5_msg, sizeof(navx5_msg));
     _send_message(CLASS_CFG, MSG_CFG_NAV_SETTINGS, NULL, 0);
+    _send_message(CLASS_CFG, MSG_CFG_NAVX5_SETTINGS, NULL, 0);
     _send_message(CLASS_CFG, MSG_CFG_GNSS, NULL, 0);
 }
 
