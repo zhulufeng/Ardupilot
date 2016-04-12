@@ -119,9 +119,9 @@ void AP_SerialManager::init()
     state[2].uart = hal.uartD;  // serial2, uartD, normally telem2
     state[3].uart = hal.uartB;  // serial3, uartB, normally 1st GPS
     state[4].uart = hal.uartE;  // serial4, uartE, normally 2nd GPS
-    state[1].uart -> begin(map_baudrate(115),128,512);
+    //state[1].uart -> begin(map_baudrate(115),128,512);
     // initialise serial ports
-    for (uint8_t i=2; i<SERIALMANAGER_NUM_PORTS; i++) {
+    for (uint8_t i=1; i<SERIALMANAGER_NUM_PORTS; i++) {
         if (state[i].uart != NULL) {
             switch (state[i].protocol) {
                 case SerialProtocol_Console:
@@ -166,6 +166,14 @@ void AP_SerialManager::init()
                     state[i].uart->begin(map_baudrate(state[i].baud),
                                          AP_SERIALMANAGER_SToRM32_BUFSIZE_RX,
                                          AP_SERIALMANAGER_SToRM32_BUFSIZE_TX);
+                    break;
+                case SerialProtocol_Print:
+                // Note baudrate is hardcoded to 57600
+                    state[i].baud = 115200 / 1000;   // update baud param in case user looks at it
+                    state[i].uart->begin(map_baudrate(state[i].baud),
+                                         AP_SERIALMANAGER_SToRM32_BUFSIZE_RX,
+                                         AP_SERIALMANAGER_SToRM32_BUFSIZE_TX);
+                    hal.console->printf_P("%s  state[%d] baud %d\n","Hello world!" ,i,map_baudrate(state[i].baud));
                     break;
             }
         }

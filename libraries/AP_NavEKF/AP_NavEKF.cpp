@@ -1136,7 +1136,7 @@ void NavEKF::UpdateStrapdownEquationsNED()
         IMU1_weighting = 0.0f;
     }
     correctedDelVel12 = correctedDelVel1 * IMU1_weighting + correctedDelVel2 * (1.0f - IMU1_weighting);
-
+    //hal.console -> printf_P("lastImuSwitchState :  %d  IMU1_weighting: %f\n", lastImuSwitchState,IMU1_weighting);
     // apply correction for earths rotation rate
     // % * - and + operators have been overloaded
     correctedDelAng   = correctedDelAng - prevTnb * earthRateNED*dtIMUactual;
@@ -2020,6 +2020,7 @@ void NavEKF::FuseVelPosNED()
             float maxPosInnov2 = sq(_gpsPosInnovGate * _gpsHorizPosNoise) + sq(0.005f * accelScale * float(_gpsGlitchAccelMax) * sq(0.001f * float(imuSampleTime_ms - lastPosPassTime)));
             posTestRatio = (sq(innovVelPos[3]) + sq(innovVelPos[4])) / maxPosInnov2;
             posHealth = ((posTestRatio < 1.0f) || badIMUdata);
+            hal.console -> printf_P("posTestRatio: %f \n",posTestRatio);
             // declare a timeout condition if we have been too long without data or not aiding
             posTimeout = (((imuSampleTime_ms - lastPosPassTime) > gpsRetryTime) || PV_AidingMode == AID_NONE);
             // use position data if healthy, timed out, or in constant position mode

@@ -23,6 +23,9 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 
+#define BYTE0(dwTemp)       (*(char *)(&dwTemp))
+#define BYTE1(dwTemp)       (*((char *)(&dwTemp) + 1))
+ 
 #if AP_AHRS_NAVEKF_AVAILABLE
 
 extern const AP_HAL::HAL& hal;
@@ -68,6 +71,7 @@ void AP_AHRS_NavEKF::update(void)
     // we need to restore the old DCM attitude values as these are
     // used internally in DCM to calculate error values for gyro drift
     // correction
+    static uint16_t loop = 0;
     roll = _dcm_attitude.x;
     pitch = _dcm_attitude.y;
     yaw = _dcm_attitude.z;
@@ -96,6 +100,44 @@ void AP_AHRS_NavEKF::update(void)
             roll  = eulers.x;
             pitch = eulers.y;
             yaw   = eulers.z;
+            loop++;
+            if(loop % 10 == 0)
+            {
+                uint8_t data_to_send[20];
+                int16_t iDcmRoll  = (int)(_dcm_attitude.x * 57.29596 * 100) ;
+                int16_t iDcmPitch = (int)(_dcm_attitude.y *  57.29596 * 100);
+                int16_t iDcmYaw   = (int)(_dcm_attitude.z *  57.29596 * 100);
+                int16_t iEKFRoll  = (int)(roll *  57.29596 * 100);
+                int16_t iEKFPitch = (int)(pitch *  57.29596 * 100);
+                int16_t iEKFYaw   = (int)(yaw *  57.29596 * 100);
+
+                char i,_cnt=0,sum = 0;
+
+                data_to_send[_cnt++]=0xAA;
+                data_to_send[_cnt++]=0xAA;
+                data_to_send[_cnt++]=0xF1;
+                data_to_send[_cnt++]=0;
+                data_to_send[_cnt++]=BYTE1(iDcmRoll);
+                data_to_send[_cnt++]=BYTE0(iDcmRoll);
+                data_to_send[_cnt++]=BYTE1(iDcmPitch);
+                data_to_send[_cnt++]=BYTE0(iDcmPitch);
+                data_to_send[_cnt++]=BYTE1(iDcmYaw);
+                data_to_send[_cnt++]=BYTE0(iDcmYaw);
+                data_to_send[_cnt++]=BYTE1(iEKFRoll);
+                data_to_send[_cnt++]=BYTE0(iEKFRoll);
+                data_to_send[_cnt++]=BYTE1(iEKFPitch);
+                data_to_send[_cnt++]=BYTE0(iEKFPitch);
+                data_to_send[_cnt++]=BYTE1(iEKFYaw);
+                data_to_send[_cnt++]=BYTE0(iEKFYaw);
+
+                data_to_send[3] = _cnt-4;
+                
+                for(i=0;i<_cnt;i++)
+                    sum += data_to_send[i];
+                data_to_send[_cnt++]=sum;
+                hal.uartC -> write(data_to_send, _cnt);
+                hal.console -> printf_P("DCM Pitch %f  EKF Pitch %f\n",_dcm_attitude.y,pitch);
+            }
 
             update_cd_values();
             update_trig();
